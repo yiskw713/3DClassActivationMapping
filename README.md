@@ -8,4 +8,4 @@ The implementation of Class Activation Mapping extended to 3DCNN
 * numpy
 
 # How to use
-Please see cam_demo.ipynb for the details.
+Please see `cam_demo.ipynb` for the details.
