@@ -83,3 +83,71 @@ class CAM(object):
         cam = cam.view(1, 1, t, h, w)
 
         return cam.data
+
+
+class GradCAM(CAM):
+    """ Grad CAM """
+
+    def __init__(self, model, target_layer):
+        super().__init__(model, target_layer)
+
+        """
+        Args:
+            model: a base model to get CAM, which need not have global pooling and fully connected layer.
+            target_layer: conv_layer you want to visualize
+        """
+
+    def forward(self, x, idx=None):
+        """
+        Args:
+            x: input image. shape =>(1, 3, T, H, W)
+            idx: ground truth index => (1, C)
+        Return:
+            heatmap: class activation mappings of the predicted class
+        """
+
+        # anomaly detection
+        score, _, _ = self.model(x)
+
+        prob = torch.softmax(score, dim=1)
+
+        if idx is None:
+            prob, idx = torch.max(prob, dim=1)
+            idx = idx.item()
+            prob = prob.item()
+            print("predicted class ids {}\t probability {}".format(idx, prob))
+
+        # caluculate cam of the predicted class
+        cam = self.getGradCAM(self.values, score, idx)
+
+        return cam, idx
+
+    def __call__(self, x, idx=None):
+        return self.forward(x, idx)
+
+    def getGradCAM(self, values, score, idx):
+        '''
+        values: the activations and gradients of target_layer
+            activations: feature map before GAP.  shape => (1, C, T, H, W)
+        score: the output of the model before softmax
+        idx: predicted class id
+        cam: class activation map.  shape=> (1, 1, T, H, W)
+        '''
+
+        self.model.zero_grad()
+
+        score[0, idx].backward(retain_graph=True)
+
+        activations = values.activations
+        gradients = values.gradients
+        n, c, _, _, _ = gradients.shape
+        alpha = gradients.view(n, c, -1).mean(2)
+        alpha = alpha.view(n, c, 1, 1, 1)
+
+        # shape => (1, 1, H', W')
+        cam = (alpha * activations).sum(dim=1, keepdim=True)
+        cam = F.relu(cam)
+        cam -= torch.min(cam)
+        cam /= torch.max(cam)
+
+        return cam.data
