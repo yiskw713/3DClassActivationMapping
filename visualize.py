@@ -23,8 +23,7 @@ def visualize(clip, cam):
     """
 
     _, _, T, H, W = clip.shape
-    cam = F.interpolate(
-        cam, size=(T, H, W), mode='trilinear', align_corners=False)
+    cam = F.interpolate(cam, size=(T, H, W), mode="trilinear", align_corners=False)
     cam = 255 * cam.squeeze()
     heatmaps = []
     for t in range(T):

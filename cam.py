@@ -1,8 +1,10 @@
 import torch
 import torch.nn.functional as F
 
+from model.resnet import ResNet
 
-class SaveValues():
+
+class SaveValues:
     def __init__(self, m):
         # register a hook to save values of activations and gradients
         self.activations = None
@@ -50,11 +52,13 @@ class CAM(object):
         prob = F.softmax(score, dim=1)
         max_prob, idx = torch.max(prob, dim=1)
         print(
-            "predicted action ids {}\t probability {}".format(idx.item(), max_prob.item()))
+            "predicted action ids {}\t probability {}".format(
+                idx.item(), max_prob.item()
+            )
+        )
 
         # cam can be calculated from the weights of linear layer and activations
-        weight_fc = list(
-            self.model._modules.get('fc').parameters())[0].to('cpu').data
+        weight_fc = list(self.model._modules.get("fc").parameters())[0].to("cpu").data
         cam = self.getCAM(self.values, weight_fc, idx.item())
 
         return cam
@@ -63,16 +67,15 @@ class CAM(object):
         return self.forward(x)
 
     def getCAM(self, values, weight_fc, idx):
-        '''
+        """
         values: the activations and gradients of target_layer
             activations: feature map before GAP.  shape => (N, C, T, H, W)
         weight_fc: the weight of fully connected layer.  shape => (num_classes, C)
         idx: predicted class id
         cam: class activation map.  shape => (1, num_classes, H, W)
-        '''
+        """
 
-        cam = F.conv3d(
-            values.activations, weight=weight_fc[:, :, None, None, None])
+        cam = F.conv3d(values.activations, weight=weight_fc[:, :, None, None, None])
         _, _, t, h, w = cam.shape
 
         # class activation mapping only for the predicted class
@@ -106,8 +109,10 @@ class GradCAM(CAM):
             heatmap: class activation mappings of the predicted class
         """
 
-        # anomaly detection
-        score, _, _ = self.model(x)
+        if isinstance(self.model, ResNet):
+            score = self.model(x)
+        else:
+            score, _, _ = self.model(x)
 
         prob = torch.softmax(score, dim=1)
 
@@ -126,13 +131,13 @@ class GradCAM(CAM):
         return self.forward(x, idx)
 
     def getGradCAM(self, values, score, idx):
-        '''
+        """
         values: the activations and gradients of target_layer
             activations: feature map before GAP.  shape => (1, C, T, H, W)
         score: the output of the model before softmax
         idx: predicted class id
         cam: class activation map.  shape=> (1, 1, T, H, W)
-        '''
+        """
 
         self.model.zero_grad()
 
